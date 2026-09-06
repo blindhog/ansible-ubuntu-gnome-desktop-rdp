@@ -1,0 +1,17 @@
+---
+# Default variables for the ubuntu_desktop_rdp role.
+
+# systemd service that provides headless Remote Login RDP.
+ubuntu_desktop_rdp_service_name: gnome-remote-desktop.service
+
+# System user the gnome-remote-desktop daemon runs as; owns the TLS material.
+ubuntu_desktop_rdp_service_user: gnome-remote-desktop
+
+# Location and lifetime of the self-signed RDP TLS certificate.
+ubuntu_desktop_rdp_tls_dir: /var/lib/gnome-remote-desktop
+ubuntu_desktop_rdp_tls_cert_path: "{{ ubuntu_desktop_rdp_tls_dir }}/rdp-tls.crt"
+ubuntu_desktop_rdp_tls_key_path: "{{ ubuntu_desktop_rdp_tls_dir }}/rdp-tls.key"
+ubuntu_desktop_rdp_tls_cert_days: 3650
+
+# Package list installed by the role, relative to the role's files/ directory.
+ubuntu_desktop_rdp_requirements_file: requirements.apt

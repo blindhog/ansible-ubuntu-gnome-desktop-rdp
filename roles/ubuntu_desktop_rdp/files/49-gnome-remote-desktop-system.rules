@@ -1,0 +1,10 @@
+// Allow root (used by Ansible with become) to configure the
+// gnome-remote-desktop system daemon without an interactive polkit prompt.
+// Root is already privileged; this only removes the auth_admin dialog so the
+// `grdctl --system` tasks can run non-interactively.
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.gnome.remotedesktop.configure-system-daemon" &&
+        subject.user == "root") {
+        return polkit.Result.YES;
+    }
+});

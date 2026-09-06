@@ -1,0 +1,6 @@
+# Packages installed by the ubuntu_desktop_rdp role.
+# One package per line; blank lines and lines starting with # are ignored.
+ubuntu-desktop
+gnome-remote-desktop
+gnome-software
+

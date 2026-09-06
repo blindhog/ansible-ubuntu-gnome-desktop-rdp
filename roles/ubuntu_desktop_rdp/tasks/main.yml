@@ -1,0 +1,142 @@
+---
+# ==========================================================================
+# TASK: Install Ubuntu Desktop and enable headless RDP (Remote Login)
+# ==========================================================================
+#
+# Installs the full Ubuntu desktop and configures GNOME Remote Desktop's
+# system daemon (Remote Login) so the host accepts RDP connections with no
+# console session present. Credentials come from vars/rdp_credentials.yml.
+#
+# Required Variables:
+#   - rdp_username: RDP login username
+#   - rdp_password: RDP login password
+#
+# ==========================================================================
+
+# --------------------------------------------------------------------------
+# Validate required variables and platform
+# --------------------------------------------------------------------------
+- name: VALIDATE | Ensure RDP credentials were provided
+  ansible.builtin.fail:
+    msg: >-
+      Both 'rdp_username' and 'rdp_password' are required. Set them in
+      vars/rdp_credentials.yml.
+  when: >-
+    rdp_username is not defined or rdp_username | length == 0
+    or rdp_password is not defined or rdp_password | length == 0
+
+- name: VALIDATE | Ensure host is Ubuntu 24.04 or newer
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['distribution'] == 'Ubuntu'
+      - ansible_facts['distribution_major_version'] | int >= 24
+    fail_msg: >-
+      This role supports Ubuntu 24.04 or newer (found
+      {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}).
+
+# --------------------------------------------------------------------------
+# Install desktop + RDP packages
+# --------------------------------------------------------------------------
+- name: INSTALL | Install Ubuntu desktop and GNOME Remote Desktop packages
+  ansible.builtin.apt:
+    name: "{{ apt_packages }}"
+    state: present
+    update_cache: true
+  vars:
+    apt_packages: >-
+      {{ lookup('ansible.builtin.file', ubuntu_desktop_rdp_requirements_file).splitlines()
+         | map('trim') | reject('match', '^#') | reject('equalto', '') | list }}
+
+# --------------------------------------------------------------------------
+# Generate self-signed TLS certificate for RDP
+# --------------------------------------------------------------------------
+- name: CERT | Ensure GNOME Remote Desktop state directory exists
+  ansible.builtin.file:
+    path: "{{ ubuntu_desktop_rdp_tls_dir }}"
+    state: directory
+    owner: "{{ ubuntu_desktop_rdp_service_user }}"
+    group: "{{ ubuntu_desktop_rdp_service_user }}"
+    mode: "0700"
+
+- name: CERT | Generate self-signed TLS certificate and key
+  ansible.builtin.command:
+    cmd: >-
+      openssl req -x509 -newkey rsa:4096 -nodes
+      -keyout {{ ubuntu_desktop_rdp_tls_key_path }}
+      -out {{ ubuntu_desktop_rdp_tls_cert_path }}
+      -days {{ ubuntu_desktop_rdp_tls_cert_days }}
+      -subj /CN={{ ansible_facts['hostname'] }}
+    creates: "{{ ubuntu_desktop_rdp_tls_cert_path }}"
+  register: ubuntu_desktop_rdp_cert_created
+  changed_when: ubuntu_desktop_rdp_cert_created is changed
+
+- name: CERT | Set ownership and permissions on TLS key
+  ansible.builtin.file:
+    path: "{{ ubuntu_desktop_rdp_tls_key_path }}"
+    owner: "{{ ubuntu_desktop_rdp_service_user }}"
+    group: "{{ ubuntu_desktop_rdp_service_user }}"
+    mode: "0600"
+
+- name: CERT | Set ownership and permissions on TLS certificate
+  ansible.builtin.file:
+    path: "{{ ubuntu_desktop_rdp_tls_cert_path }}"
+    owner: "{{ ubuntu_desktop_rdp_service_user }}"
+    group: "{{ ubuntu_desktop_rdp_service_user }}"
+    mode: "0644"
+
+# --------------------------------------------------------------------------
+# Configure GNOME Remote Desktop system daemon (Remote Login)
+# --------------------------------------------------------------------------
+- name: RDP | Allow root to configure the system daemon (polkit rule)
+  ansible.builtin.copy:
+    src: 49-gnome-remote-desktop-system.rules
+    dest: /etc/polkit-1/rules.d/49-gnome-remote-desktop-system.rules
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: RDP | Query current system RDP status
+  ansible.builtin.command:
+    cmd: grdctl --system status --show-credentials
+  register: ubuntu_desktop_rdp_status
+  changed_when: false
+  failed_when: false
+
+- name: RDP | Configure system RDP TLS certificate
+  ansible.builtin.command:
+    cmd: grdctl --system rdp set-tls-cert {{ ubuntu_desktop_rdp_tls_cert_path }}
+  when: ubuntu_desktop_rdp_tls_cert_path not in (ubuntu_desktop_rdp_status.stdout | default(''))
+  changed_when: true
+  notify: Restart gnome-remote-desktop
+
+- name: RDP | Configure system RDP TLS key
+  ansible.builtin.command:
+    cmd: grdctl --system rdp set-tls-key {{ ubuntu_desktop_rdp_tls_key_path }}
+  when: ubuntu_desktop_rdp_tls_key_path not in (ubuntu_desktop_rdp_status.stdout | default(''))
+  changed_when: true
+  notify: Restart gnome-remote-desktop
+
+- name: RDP | Set system RDP credentials
+  ansible.builtin.command:
+    cmd: grdctl --system rdp set-credentials {{ rdp_username }} {{ rdp_password }}
+  when: rdp_username not in (ubuntu_desktop_rdp_status.stdout | default(''))
+  changed_when: true
+  no_log: true
+  notify: Restart gnome-remote-desktop
+
+- name: RDP | Enable system RDP
+  ansible.builtin.command:
+    cmd: grdctl --system rdp enable
+  when: >-
+    not ((ubuntu_desktop_rdp_status.stdout | default('')) is search('RDP:\s*Status:\s*enabled'))
+  changed_when: true
+  notify: Restart gnome-remote-desktop
+
+# --------------------------------------------------------------------------
+# Enable and start the system service
+# --------------------------------------------------------------------------
+- name: SERVICE | Enable and start gnome-remote-desktop system service
+  ansible.builtin.systemd_service:
+    name: "{{ ubuntu_desktop_rdp_service_name }}"
+    enabled: true
+    state: started

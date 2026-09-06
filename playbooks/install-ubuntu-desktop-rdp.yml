@@ -1,0 +1,25 @@
+---
+# =============================================================================
+# Playbook: Install Ubuntu Desktop and enable headless RDP
+# =============================================================================
+#
+# Purpose: Install the full Ubuntu desktop and enable GNOME Remote Desktop's
+#          system-level Remote Login so the host accepts RDP connections
+#          without a console session.
+#
+# Prerequisites:
+#   - Target hosts run Ubuntu 24.04 or newer.
+#   - RDP credentials set in vars/rdp_credentials.yml.
+#
+# Usage:
+#   ansible-playbook playbooks/install-ubuntu-desktop-rdp.yml
+# =============================================================================
+
+- name: Install Ubuntu Desktop and enable RDP
+  hosts: desktop_servers
+  become: true
+  gather_facts: true
+  vars_files:
+    - ../vars/rdp_credentials.yml
+  roles:
+    - ubuntu_desktop_rdp
