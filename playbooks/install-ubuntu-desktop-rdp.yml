@@ -12,7 +12,7 @@
 #   - RDP credentials set in vars/rdp_credentials.yml.
 #
 # Usage:
-#   ansible-playbook playbooks/install-ubuntu-desktop-rdp.yml
+#   ansible-playbook playbooks/install-ubuntu-desktop-rdp.yml -K
 # =============================================================================
 
 - name: Install Ubuntu Desktop and enable RDP
@@ -21,5 +21,43 @@
   gather_facts: true
   vars_files:
     - ../vars/rdp_credentials.yml
+  pre_tasks:
+    - name: PROMPT | Ask for RDP username when still set to CHANGEME
+      ansible.builtin.pause:
+        prompt: "RDP username"
+      register: rdp_username_prompt
+      when: rdp_username == "CHANGEME"
+
+    - name: PROMPT | Apply prompted RDP username
+      ansible.builtin.set_fact:
+        rdp_username: "{{ rdp_username_prompt.user_input | trim }}"
+      when: rdp_username == "CHANGEME"
+
+    - name: PROMPT | Ask for RDP password when still set to CHANGEME
+      ansible.builtin.pause:
+        prompt: "RDP password"
+        echo: false
+      register: rdp_password_prompt
+      when: rdp_password == "CHANGEME"
+
+    - name: PROMPT | Apply prompted RDP password
+      ansible.builtin.set_fact:
+        rdp_password: "{{ rdp_password_prompt.user_input }}"
+      when: rdp_password == "CHANGEME"
+      no_log: true
+
+    - name: PROMPT | Ask for desktop users (comma-separated)
+      ansible.builtin.pause:
+        prompt: >-
+          Desktop users for RDP/GPU access, comma-separated
+          [{{ desktop_users | default([]) | join(',') }}]
+      register: desktop_users_prompt
+
+    - name: PROMPT | Apply prompted desktop users
+      ansible.builtin.set_fact:
+        desktop_users: >-
+          {{ desktop_users_prompt.user_input.split(',')
+             | map('trim') | reject('equalto', '') | list }}
+      when: desktop_users_prompt.user_input | trim | length > 0
   roles:
     - ubuntu_desktop_rdp
