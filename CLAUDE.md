@@ -5,10 +5,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 0. Hard Constraints
 
-These are not style preferences. The git-write ban is enforced by permission deny rules in `.claude/settings.json` (commit/push/tag/merge/PR-create); the model-selection rule below is not tool-enforced and relies on you following it. This section explains the intent so you work *with* the rules instead of around them.
-
-**Never commit, push, tag, merge, or open PRs.** The use runs every git write. Finish your work, leave the tree dirty, and summarize what changed and why. Do not stage files "to make it easier", do not suggest the exact commit command as a workaround, and do not route around the block via scripts, aliases, or `bash -c`. Read-only git (`status`, `diff`, `log`, `show`) is fine and encouraged.
-
 **Use Opus. Never pick Sonnet yourself.** The default model is pinned to Opus for this repo. When you spawn subagents, let them inherit the parent model — do not pass a `model` override. The one exception: if a `superpowers` skill explicitly directs a specific model for a step, follow the skill. Absent that explicit direction, Opus.
 
 ## 1. Think Before Coding
