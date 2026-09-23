@@ -10,6 +10,7 @@
 # Required Variables:
 #   - rdp_username: RDP login username
 #   - rdp_password: RDP login password
+#   - desktop_users: local Linux accounts added to the render and video groups
 #
 # ==========================================================================
 
@@ -24,6 +25,13 @@
   when: >-
     rdp_username is not defined or rdp_username | length == 0
     or rdp_password is not defined or rdp_password | length == 0
+
+- name: VALIDATE | Ensure desktop users were provided
+  ansible.builtin.fail:
+    msg: >-
+      The 'desktop_users' list is required. Set it in
+      inventory/host_vars/<host>/vars.yml.
+  when: desktop_users is not defined or desktop_users | length == 0
 
 - name: VALIDATE | Ensure host is Ubuntu 24.04 or newer
   ansible.builtin.assert:
@@ -131,6 +139,24 @@
     not ((ubuntu_desktop_rdp_status.stdout | default('')) is search('RDP:\s*Status:\s*enabled'))
   changed_when: true
   notify: Restart gnome-remote-desktop
+
+# --------------------------------------------------------------------------
+# Grant GPU device access to desktop users
+# --------------------------------------------------------------------------
+- name: VALIDATE | Ensure desktop users exist
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ item }}"
+  loop: "{{ desktop_users }}"
+
+- name: USER | Add desktop users to render and video groups
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups:
+      - render
+      - video
+    append: true
+  loop: "{{ desktop_users }}"
 
 # --------------------------------------------------------------------------
 # Enable and start the system service

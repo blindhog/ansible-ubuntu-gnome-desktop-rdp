@@ -41,10 +41,20 @@
 - Smoke-test the `grdctl --system` task sequence against a live Ubuntu 24.04+
   host; the exact `grdctl` subcommand syntax shifted between GNOME 46 and 48.
 
+## Session 2 — 2026-09-22 (~0.25 hr)
+
+- Added GPU device access for desktop users: new required `desktop_users`
+  variable (validated non-empty) and tasks that verify each user exists, then
+  append them to the `render` and `video` groups (`usermod -aG render,video`). Set to `josh`
+  for `localhost` in `inventory/host_vars/localhost/vars.yml`.
+- Documented the new variable and behavior in the role README, including a
+  "Which account is which" section contrasting `desktop_users`,
+  `ubuntu_desktop_rdp_service_user`, and `rdp_username`.
+
 ## Summary
 
 | Metric        | Value |
 |---------------|-------|
-| Calendar days | 1     |
-| Sessions      | 1     |
-| Est. hours    | 1     |
+| Calendar days | 2     |
+| Sessions      | 2     |
+| Est. hours    | 1.25  |
