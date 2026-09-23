@@ -16,16 +16,21 @@ session — no console login or attached monitor required.
    non-interactively (see Notes).
 4. Configures the system daemon via `grdctl --system` (TLS cert/key, RDP
    credentials) and enables RDP.
-5. Enables and starts `gnome-remote-desktop.service`.
+5. Adds each user in `desktop_users` to the `render` and `video`
+   groups so their RDP sessions can access the GPU (see Notes).
+6. Enables and starts `gnome-remote-desktop.service`.
 
 ## Required variables
 
-| Variable       | Description          |
-|----------------|----------------------|
-| `rdp_username` | RDP login username   |
-| `rdp_password` | RDP login password   |
+| Variable        | Description                                                      |
+|-----------------|------------------------------------------------------------------|
+| `rdp_username`  | RDP login username                                               |
+| `rdp_password`  | RDP login password                                               |
+| `desktop_users` | Local Linux accounts added to the `render` and `video` groups    |
 
-Set these in `vars/rdp_credentials.yml` (see the repository root).
+Set `rdp_username` and `rdp_password` in `vars/rdp_credentials.yml` (see the
+repository root). Set `desktop_users` per host in
+`inventory/host_vars/<host>/vars.yml`.
 
 ## Key defaults
 
@@ -36,6 +41,26 @@ See `defaults/main.yml`. Notable values:
 | `ubuntu_desktop_rdp_tls_dir`        | `/var/lib/gnome-remote-desktop`         |
 | `ubuntu_desktop_rdp_tls_cert_days`  | `3650`                                  |
 | `ubuntu_desktop_rdp_service_name`   | `gnome-remote-desktop.service`          |
+
+## Which account is which
+
+`desktop_users`, `ubuntu_desktop_rdp_service_user`, and `rdp_username` are
+three separate identities. They are not interchangeable:
+
+| Variable                          | What it is                                                                                              | What the role does with it                                                                |
+|-----------------------------------|---------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
+| `rdp_username`                    | An RDP-only credential stored by the daemon. It is not a Linux account and need not exist in `/etc/passwd` | Passes it to `grdctl --system rdp set-credentials`                                      |
+| `ubuntu_desktop_rdp_service_user` | The `gnome-remote-desktop` system account the RDP daemon runs as (created by the package, no login)    | Makes it the owner of the TLS certificate and key                                         |
+| `desktop_users`                   | Real people: the local Linux accounts you sign in as at the GNOME login screen after connecting        | Adds each one to `render` and `video` so their GNOME session can use the GPU (`/dev/dri`) |
+
+Connecting is a two-step login: the RDP client authenticates to the daemon
+with `rdp_username`/`rdp_password`, then you sign in at the GNOME login screen
+as one of the `desktop_users` with that account's own Linux password.
+
+Put your own login accounts in `desktop_users`, usually in
+`inventory/host_vars/<host>/vars.yml`. Leave `ubuntu_desktop_rdp_service_user`
+at its default unless your distribution runs the daemon under a different
+account. Never add the service user to `desktop_users`.
 
 ## Notes
 
@@ -53,3 +78,9 @@ See `defaults/main.yml`. Notable values:
   credentials only when the configured username is not already present in
   `grdctl --system status`. Changing only the password requires clearing the
   stored credential (or temporarily changing the username) so the task runs.
+- RDP sessions need read/write access to the GPU device nodes under
+  `/dev/dri`, which are owned by the `render` and `video` groups. List the
+  local users who log in over RDP in `desktop_users`; the role appends those
+  groups (equivalent to `usermod -aG render,video <user>`) and fails if a
+  listed user does not exist. Membership applies at the user's next
+  login, so sign out of any existing session afterwards.
