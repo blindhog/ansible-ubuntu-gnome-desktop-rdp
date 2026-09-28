@@ -1,5 +1,6 @@
 ---
 ansible_connection: local
+ansible_become_password: "CHANGEME"
 
 desktop_users:
   - josh

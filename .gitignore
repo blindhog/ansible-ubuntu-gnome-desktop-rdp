@@ -2,3 +2,9 @@
 .history
 *.local*
 .claude
+
+# host_vars carry plaintext ansible_password/ansible_become_password.
+# Guard against accidentally committing them; localhost's file has no secrets
+# and is already tracked.
+inventory/host_vars/*/vars.yml
+!inventory/host_vars/localhost/vars.yml

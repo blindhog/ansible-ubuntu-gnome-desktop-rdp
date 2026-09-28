@@ -15,6 +15,23 @@
 #   ansible-playbook playbooks/install-ubuntu-desktop-rdp.yml -K
 # =============================================================================
 
+# Ubuntu 25.10+ ships sudo-rs as `sudo`, which ignores `-p`; Ansible then never
+# sees its become prompt and times out. sudo.ws is the original sudo binary.
+# Detected without become, since become is what breaks.
+- name: Select sudo binary by Ubuntu release
+  hosts: desktop_servers
+  become: false
+  gather_facts: true
+  gather_subset:
+    - min
+  tasks:
+    - name: FACT | Use sudo.ws on Ubuntu 25 and newer
+      ansible.builtin.set_fact:
+        ansible_become_exe: /usr/bin/sudo.ws
+      when:
+        - ansible_facts['distribution'] == "Ubuntu"
+        - ansible_facts['distribution_major_version'] | int >= 25
+
 - name: Install Ubuntu Desktop and enable RDP
   hosts: desktop_servers
   become: true
@@ -53,11 +70,15 @@
           [{{ desktop_users | default([]) | join(',') }}]
       register: desktop_users_prompt
 
+    # pause runs once per batch and registers its result only on the first
+    # host, so every host reads the answer from there.
     - name: PROMPT | Apply prompted desktop users
       ansible.builtin.set_fact:
         desktop_users: >-
-          {{ desktop_users_prompt.user_input.split(',')
+          {{ desktop_users_input.split(',')
              | map('trim') | reject('equalto', '') | list }}
-      when: desktop_users_prompt.user_input | trim | length > 0
+      vars:
+        desktop_users_input: "{{ hostvars[ansible_play_batch[0]]['desktop_users_prompt']['user_input'] }}"
+      when: desktop_users_input | trim | length > 0
   roles:
     - ubuntu_desktop_rdp
