@@ -15,7 +15,7 @@
 #   ansible-playbook playbooks/install-ubuntu-desktop-rdp.yml -K
 # =============================================================================
 
-# Ubuntu 25.10+ ships sudo-rs as `sudo`, which ignores `-p`; Ansible then never
+# Ubuntu 26+ ships sudo-rs as `sudo`, which ignores `-p`; Ansible then never
 # sees its become prompt and times out. sudo.ws is the original sudo binary.
 # Detected without become, since become is what breaks.
 - name: Select sudo binary by Ubuntu release
@@ -25,12 +25,12 @@
   gather_subset:
     - min
   tasks:
-    - name: FACT | Use sudo.ws on Ubuntu 25 and newer
+    - name: FACT | Use sudo.ws on Ubuntu 26 and newer
       ansible.builtin.set_fact:
         ansible_become_exe: /usr/bin/sudo.ws
       when:
         - ansible_facts['distribution'] == "Ubuntu"
-        - ansible_facts['distribution_major_version'] | int >= 25
+        - ansible_facts['distribution_major_version'] | int >= 26
 
 - name: Install Ubuntu Desktop and enable RDP
   hosts: desktop_servers
